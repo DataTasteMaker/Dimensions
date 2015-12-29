@@ -1,0 +1,85 @@
+'! ************************************************************************************************************************
+File Name	 	: List_Empty_NonEmpty_Vars.mrs
+Designed by	 	: Viraj Bhargave (bviraj@gmail.com)
+Created on		: 28-09-2014
+Last Updated		: 16-10-2014
+Current Version		: V1_16102014 (Version number + Last Updated Date)
+
+	This script is used to list down all the Empty and non-Empty variables. The list is written in the "variable_list.txt"
+file.
+
+*** Version Changes:
+	V0 -	Initial setup
+	V1 -	1. File name changed from "List_Empty_Vars.mrs" to "List_Empty_NonEmpty_Vars.mrs".
+		2. Bug fixes.
+		3. The script now creates a text file to list down the variables.
+		4. The output is now 2 lists one with empty variables and the other with non-empty variables.
+
+' ************************************************************************************************************************
+!'
+
+dim oMDM , oVar , oConn, oRS, oVarList, oVarListempty
+dim oMyFso, oMytxtfile, i
+dim mdd_ddf_name
+
+Set oMyFso      = CreateObject("Scripting.FileSystemObject")
+Set oMytxtfile  = oMyFso.CreateTextFile("variable_list.txt", True, False)
+Set oMDM        = CreateObject("MDM.Document")
+
+mdd_ddf_name = "MDDNAME"
+
+oMDM.Open(mdd_ddf_name + ".mdd", , 1)
+
+i = 0
+
+For Each oVar in oMDM.Variables
+	i = i + 1       ''' Number the variables to be processed
+	debug.echo(ctext(i) + " - " + ctext(oVar.FullName))
+	
+	if oVar.IsSystem = False and oVar.HasCaseData = True then            ''' Comment/Uncomment this to include/exclude System variables
+	
+		' Code to check if the field has data in it.
+		Set oConn = CreateObject("ADODB.Connection")
+		
+		oConn.ConnectionString = "Provider=mrOleDB.Provider.2;Data Source=mrDataFileDsc;Location="+mdd_ddf_name+".DDF;Initial Catalog="+mdd_ddf_name+".mdd"
+		
+		oConn.Open()
+		
+		If ( oConn.State = 1 ) Then
+		
+			Set oRS = CreateObject("ADODB.Recordset")
+			
+			oRS.Open("SELECT COUNT(*) FROM VDATA WHERE " + oVar.FullName + " IS NOT NULL" ,oConn,3,1)
+			
+			If ( oRS.EOF = true and oRS.BOF = true ) Then
+				oVarListempty = oVarListempty + oVar.FullName + " ,"
+			else
+				oVarList = oVarList + oVar.FullName + " ,"
+			End if
+			
+			Set oRS = Null
+		
+		End If
+		
+		oConn.Close()
+		
+		Set oConn = Null
+		
+	end if                                   ''' Comment/Uncomment this to include/exclude System variables
+Next
+
+oMDM.Close()
+
+oVarList	= Left(oVarList,len(oVarList)-1)
+oVarListempty	= Left(oVarListempty,len(oVarListempty)-1)
+
+oVarList	= replace(oVarList,",",mr.CrlF)
+oVarListempty	= replace(oVarListempty,",",mr.CrlF)
+
+oMytxtfile.Writeline("")
+oMytxtfile.Writeline("The Emtpy list:-" + mr.CrlF + mr.CrlF + ctext(oVarListempty))
+oMytxtfile.Writeline("")
+oMytxtfile.Writeline("**************************************************")
+oMytxtfile.Writeline("")
+oMytxtfile.Writeline("The non Empty list:-" + mr.CrlF + mr.CrlF + ctext(oVarList))
+oMytxtfile.Writeline("")

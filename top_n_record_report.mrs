@@ -1,0 +1,103 @@
+'! ************************************************************************************************************************
+File Name               : top_n_record_report.mrs
+Designed by             : Viraj Bhargave (bviraj@gmail.com)
+Created on              : 23-02-2015
+Last Updated            : 23-02-2015
+Current Version         : V0_23022015 (Version number + Last Updated Date)
+
+        This script is used to pull data for top "n" records in excel.
+
+top_n_record_report(mdd_ddf_name,n,"LIST_OF_VARS","ADNL_FILTER")
+
+        1. mdd_ddf_name = MDD and DDF name should be same
+        2. n            = Top "n" no. of records e.g. 10, 100, etc
+        3. LIST_OF_VARS = The list of variables for those "n" records
+        4. ADNL_FILTER  = Any Additional filer e.g. Complete respondents, Group, version etc.
+
+e.g.
+        top_n_record_report("MYDATA",10,"*"," AND QA * {FEMALE}")
+                This will all data (*) pull data for top 10 female records from the data file MYDATA
+
+*** Version Changes:
+        V0 -    Initial Setup
+
+' ************************************************************************************************************************
+!'
+
+top_n_record_report("myDATA",100,"*"," ")
+
+
+
+'<-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><-><->
+
+
+Function top_n_record_report(mdd_ddf,n,LIST_OF_VARS,ADNL_FILTER)
+        dim oMyFso, oRptFile
+        dim oConnStr, oConn, oQuery, oQuery2, oConnStr2
+        dim oRS, i
+        dim mdd_ddf_name
+        dim ID_FILTER, ADD_FILTER
+        dim sqlQuery, oxlApp, oxlWorkbook, oxlWorksheet
+
+        mdd_ddf_name = mdd_ddf
+
+        Set oMyFso = CreateObject("Scripting.FileSystemObject")
+        Set oRptFile = oMyFso.CreateTextFile("Report_Output.txt", TRUE, TRUE)   ' A report file to log any output
+
+        ' Connection string to get the Top n records
+        oConnStr = "Provider=mrOleDB.Provider.2; MR INIT CUSTOM = FavorMemory; MR Init Category Names=1; _
+        Data Source = mrDataFileDsc; Location = "+mdd_ddf_name+".DDF; Initial Catalog="+mdd_ddf_name+".mdd;"
+
+        Set oConn = CreateObject("ADODB.Connection")
+        oConn.Open(oConnStr)
+
+        oQuery = "SELECT RESPONDENT.SERIAL FROM VDATA ORDER BY RESPONDENT.SERIAL ASC"
+
+        Set oRS = oConn.Execute(oQuery)
+
+        i = 0
+        While NOT oRS.EOF
+                oRptFile.writeline(ctext(oRS.Fields[0].value))
+                oQuery2 = oQuery2 + ctext(oRS.Fields[0].value) + ", "
+
+                oRS.MoveNext()
+                i = i + 1
+
+                if i = n then goto outofloop
+
+        End While
+
+        outofloop:
+        oRptFile.writeline(left(ctext(oQuery2),len(ctext(oQuery2))-2))
+
+        oConn.Close()
+        oRptFile.Close()
+
+        ID_FILTER = "WHERE RESPONDENT.SERIAL.ContainsAny({"+left(ctext(oQuery2),len(ctext(oQuery2))-2)+"})"
+        ADD_FILTER = ctext(ADNL_FILTER)
+
+        sqlQuery = "SELECT RESPONDENT.SERIAL, "+ ctext(LIST_OF_VARS) +" FROM VDATA " + ID_FILTER + " " + ADD_FILTER
+debug.echo(sqlQuery)
+'       **************************************************************************************************************************************************
+        oConnStr2 = "OLEDB; Provider=mrOleDB.Provider.2; Data Source=mrDataFileDSC; _
+        Initial Catalog= "+ oMyFso.GetAbsolutePathName(mdd_ddf_name + ".mdd")+"; _
+        Location ="+ oMyFso.GetAbsolutePathName(mdd_ddf_name + ".ddf")+"; MR Init Category Names=1"
+
+        Set oxlApp = CreateObject("Excel.Application")
+        oxlApp.Visible = FALSE
+        Set oxlWorkbook = oxlApp.Workbooks.Add()
+
+        Set oxlWorksheet = oxlWorkbook.Worksheets[1]
+
+        oxlWorksheet.QueryTables.Add(oConnStr2, oxlWorksheet.Range["A1"], sqlQuery).Refresh()
+
+        oxlWorkbook.Worksheets[1].activate()
+
+        if oMyFso.FileExists(oMyFso.GetAbsolutePathName(mdd_ddf_name + ".xls")) then oMyFso.DeleteFile(oMyFso.GetAbsolutePathName(mdd_ddf_name + ".xls"))
+        oxlWorkbook.SaveAs(oMyFso.GetAbsolutePathName(mdd_ddf_name + ".xls"))
+
+        oxlWorkbook.Close()
+        Set oxlWorkbook = Null
+        oConnStr2 = Null
+	Set oxlApp = Null
+end Function
