@@ -1,0 +1,77 @@
+'! ************************************************************************************************************************
+File Name	 	: dmgrJob.Questions.mrs
+Designed by	 	: Viraj Bhargave (bviraj@gmail.com)
+Created on		: 25-11-2014
+Last Updated		: 25-11-2014
+Current Version		: V0_25112014 (Version number + Last Updated Date)
+
+	This script helps us understand how the dmgrJob.Questions works with Grid variables.
+
+
+*** Version Changes:
+	V0 -	Initial setup
+
+' ************************************************************************************************************************
+!'
+
+InputDataSource(Input,"The Input data source")
+        ConnectionString = "_
+        Provider = mrOleDB.Provider.2;_
+        Data Source = mrDataFileDSC;_
+        Initial Catalog = JOBNO.mdd;_
+        Location = JOBNO.ddf"
+        SelectQuery  ="SELECT * FROM VDATA "
+End InputDataSource
+
+' No output files required as this is just a validation script.
+OutputDatasource(Output, "The output data source")
+	ConnectionString = "Provider=mrOleDB.Provider.2; Data Source=CDSC"
+End OutputDatasource
+
+Event(OnBeforeJobStart, "Files and folder management")
+	Dim MyFso, files, fileIndex
+	Set MyFso = CreateObject("Scripting.FileSystemObject")
+
+	set files = MyFso.GetFolder(".").Files
+	for fileIndex = 0 to files.Count
+		if (MyFso.FileExists("MDD_OUT_" + ctext(fileIndex) + ".mdd")) then MyFso.DeleteFile("MDD_OUT_" + ctext(fileIndex) + ".mdd")
+	next
+	
+	If MyFso.FolderExists("output") = False Then MyFso.CreateFolder("output")
+	If MyFso.FolderExists("logs") = False Then MyFso.CreateFolder("logs")
+      
+End Event
+
+' Incase logs required then uncomment this section
+
+''' Logging(myLog, "My Logging section")
+''' 	Group = "mrDMgr"
+''' 	Path  = "logs"
+''' 	Alias = "vibhtest"
+''' 	FileSize = 1000
+''' End Logging
+
+Event(OnJobStart, "Report and other global files") 
+  Dim fso, txtfile
+  Set fso = CreateObject("Scripting.FileSystemObject") 
+  Set txtfile = fso.CreateTextFile("report.txt", True, True) 
+  dmgrGlobal.Add("report")
+  Set dmgrGlobal.mytextfile = txtfile 
+  
+End Event
+
+Event (OnNextCase, "work with Case data")
+
+dim rserial, i
+rserial = respondent.serial
+
+i = 0
+
+dmgrGlobal.txtfile.writeLine(ctext(rserial) + mr.Tab + ctext(dmgrJob.Questions.S3.Count))
+
+for i = 0 to dmgrJob.Questions.S3.Count - 1
+	dmgrGlobal.txtfile.writeLine(dmgrJob.Questions.S3.Item[i].Item["Slice"])
+next
+
+End Event
+
